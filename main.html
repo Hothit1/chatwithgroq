@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Llama 3.1 70B Chat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .chat-container {
+            height: calc(100vh - 200px);
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto p-4">
+        <h1 class="text-3xl font-bold mb-4">Llama 3.1 70B Chat</h1>
+        <div class="mb-4">
+            <input type="password" id="apiKey" placeholder="Enter your Groq API key" class="w-full p-2 border rounded">
+        </div>
+        <div class="chat-container bg-white border rounded p-4 overflow-y-auto mb-4">
+            <div id="chatMessages"></div>
+        </div>
+        <div class="flex">
+            <input type="text" id="userInput" placeholder="Type your message..." class="flex-grow p-2 border rounded-l">
+            <button id="sendButton" class="bg-blue-500 text-white px-4 py-2 rounded-r">Send</button>
+        </div>
+    </div>
+
+    <script>
+        const apiKeyInput = document.getElementById('apiKey');
+        const userInput = document.getElementById('userInput');
+        const sendButton = document.getElementById('sendButton');
+        const chatMessages = document.getElementById('chatMessages');
+
+        let conversationHistory = [];
+
+        sendButton.addEventListener('click', sendMessage);
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        function sendMessage() {
+            const message = userInput.value.trim();
+            const apiKey = apiKeyInput.value.trim();
+
+            if (!message || !apiKey) return;
+
+            addMessageToChat('user', message);
+            userInput.value = '';
+
+            conversationHistory.push({ role: "user", content: message });
+
+            fetch('https://api.groq.com/openai/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: "llama-3.1-70b-versatile",
+                    messages: conversationHistory,
+                    max_tokens: 4096
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.choices && data.choices.length > 0 && data.choices[0].message) {
+                    const assistantMessage = data.choices[0].message.content;
+                    addMessageToChat('assistant', assistantMessage);
+                    conversationHistory.push({ role: "assistant", content: assistantMessage });
+                } else {
+                    throw new Error('Unexpected response structure');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                addMessageToChat('system', `An error occurred: ${error.message}. Please try again.`);
+            });
+        }
+
+        function addMessageToChat(role, content) {
+            const messageElement = document.createElement('div');
+            messageElement.className = `mb-2 ${role === 'user' ? 'text-right' : 'text-left'}`;
+            messageElement.innerHTML = `
+                <span class="inline-block p-2 rounded ${role === 'user' ? 'bg-blue-200' : role === 'assistant' ? 'bg-green-200' : 'bg-red-200'}">
+                    ${content}
+                </span>
+            `;
+            chatMessages.appendChild(messageElement);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+    </script>
+</body>
+</html>
